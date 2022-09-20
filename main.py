@@ -1,17 +1,37 @@
-# This is a sample Python script.
+import torch.multiprocessing as mp
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import argparse
 
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, '
-          f'')  # Press ⌘F8 to toggle the breakpoint.
+from actor import actor_process
+from learner import learner_process
+mp.set_start_method('spawn', force=True)
 
 
-# Press the green button in the gutter to run the script.
+def run():
+    mp.freeze_support()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--n_actors', type=int, default=1)
+    args = parser.parse_args()
+    mp_manager = mp.Manager()
+    shared_dict = mp_manager.dict()
+
+    # learner process
+    processes = [mp.Process(
+        target=learner_process,
+        args=(args.n_actors, shared_dict))]
+
+    for actor_id in range(args.n_actors):
+        processes.append(mp.Process(
+            target=actor_process,
+            args=(actor_id, args.n_actors, shared_dict, 'cuda:'+str(actor_id%2+1))))
+
+    for i in range(len(processes)):
+        processes[i].start()
+
+    for p in processes:
+        p.join()
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    run()
